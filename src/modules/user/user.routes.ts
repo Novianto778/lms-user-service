@@ -1,11 +1,11 @@
 import { Role } from '@prisma/client';
-import express from 'express';
+import { Router } from 'express';
 import { authenticateToken, authorizeRoles } from '../../middleware/authMiddleware';
 import { validateRequest } from '../../middleware/validateMiddleware';
-import { userController } from './user.controller';
 import { getUserByIdParamsSchema } from './user.schema';
+import { userController } from './user.controller';
 
-const router = express.Router();
+const router = Router();
 
 // // Auth routes
 // router.post(
@@ -38,5 +38,8 @@ router.get(
   }),
   userController.getUserById,
 );
+
+router.get('/:id/status', authenticateToken, userController.getUserStatus);
+router.post('/status/bulk', authenticateToken, userController.getBulkUserStatus);
 
 export default router;

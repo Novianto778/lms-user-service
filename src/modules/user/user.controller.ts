@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { handleServiceResponse } from '../../utils/httpHandlers';
 import { userService } from './user.service';
 import { asyncWrapper } from '../../utils/asyncWrapper';
+import { AppError } from '../../model/errorModel';
+import { StatusCodes } from 'http-status-codes';
 
 class UserController {
   public register = asyncWrapper(async (req: Request, res: Response) => {
@@ -55,6 +57,20 @@ class UserController {
     }
 
     const serviceResponse = await userService.getProfile(userId);
+    handleServiceResponse(serviceResponse, res);
+  });
+
+  public getUserStatus = asyncWrapper(async (req: Request, res: Response) => {
+    const serviceResponse = await userService.getUserStatus(req.params.id);
+    handleServiceResponse(serviceResponse, res);
+  });
+
+  public getBulkUserStatus = asyncWrapper(async (req: Request, res: Response) => {
+    const userIds = req.body.userIds;
+    if (!Array.isArray(userIds)) {
+      throw new AppError('userIds must be an array', StatusCodes.BAD_REQUEST);
+    }
+    const serviceResponse = await userService.getBulkUserStatus(userIds);
     handleServiceResponse(serviceResponse, res);
   });
 }

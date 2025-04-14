@@ -12,6 +12,11 @@ import { env } from '../../config/env';
 import { kafkaProducer } from '../../config/kafka';
 import { KAFKA_TOPICS } from '../../constants/kafka';
 import { KafkaMessage, UserCreatedEvent } from '../../types/kafka';
+import { UserStatusManager } from '../../utils/userStatus';
+
+interface UserWithStatus extends UserReturn {
+  online: boolean;
+}
 
 export class UserService {
   private userRepository: UserRepository;
@@ -115,9 +120,11 @@ export class UserService {
     return ServiceResponse.success('User found', res.data);
   }
 
-  async findAll(): Promise<ServiceResponse<UserReturn[]>> {
+  async findAll(): Promise<ServiceResponse<UserWithStatus[]>> {
+    // 1. Get all users from database
     const users = await this.userRepository.findAllAsync();
 
+    // 2. Parse users and validate with schema
     const parsedUsers = users.map((user) => {
       const res = userReturnSchema.safeParse(user);
       if (!res.success) {
@@ -126,12 +133,43 @@ export class UserService {
       return res.data;
     });
 
-    return ServiceResponse.success('Users retrieved successfully', parsedUsers);
+    // 3. Get online status for all users in bulk
+    const userIds = parsedUsers.map((user) => user.id);
+    const onlineStatuses = await UserStatusManager.getMultipleStatus(userIds);
+
+    // 4. Combine user data with online status
+    const usersWithStatus = parsedUsers.map((user) => ({
+      ...user,
+      online: onlineStatuses[user.id] || false,
+    }));
+
+    return ServiceResponse.success('Users retrieved successfully', usersWithStatus);
   }
 
   async getProfile(userId: string): Promise<ServiceResponse<UserReturn>> {
     const user = await this.findById(userId);
     return ServiceResponse.success('User profile retrieved successfully', user.data);
+  }
+
+  async getUserStatus(userId: string): Promise<ServiceResponse<{ online: boolean }>> {
+    const user = await this.userRepository.findByIdAsync(userId);
+    if (!user) {
+      throw new AppError('User not found', StatusCodes.NOT_FOUND);
+    }
+
+    const isOnline = await UserStatusManager.isOnline(userId);
+    return ServiceResponse.success('User status retrieved', { online: isOnline });
+  }
+
+  async getBulkUserStatus(userIds: string[]): Promise<ServiceResponse<Record<string, boolean>>> {
+    // Verify all users exist
+    const users = await this.userRepository.findByIdsAsync(userIds);
+    if (users.length !== userIds.length) {
+      throw new AppError('One or more users not found', StatusCodes.NOT_FOUND);
+    }
+
+    const statuses = await UserStatusManager.getMultipleStatus(userIds);
+    return ServiceResponse.success('User statuses retrieved', statuses);
   }
 }
 

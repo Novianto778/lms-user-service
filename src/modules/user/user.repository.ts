@@ -27,6 +27,12 @@ export class UserRepository {
     });
   }
 
+  async findByIdsAsync(ids: string[]): Promise<User[]> {
+    return await prisma.user.findMany({
+      where: { id: { in: ids } },
+    });
+  }
+
   async findByEmailAsync(email: string): Promise<User | null> {
     return await prisma.user.findUnique({
       where: { email },

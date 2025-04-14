@@ -6,6 +6,7 @@ import { JWTPayload } from '../types/express';
 import { env } from '../config/env';
 import { Role } from '@prisma/client';
 import { UserActivityManager } from '../utils/userActivity';
+import { UserStatusManager } from '../utils/userStatus';
 
 export const authenticateToken = async (req: Request, _res: Response, next: NextFunction) => {
   try {
@@ -23,6 +24,9 @@ export const authenticateToken = async (req: Request, _res: Response, next: Next
     if (!isActive) {
       throw new AuthenticationError('Session expired due to inactivity', StatusCodes.UNAUTHORIZED);
     }
+
+    // Update online status
+    await UserStatusManager.setOnline(decoded.id);
 
     req.user = {
       id: decoded.id,
